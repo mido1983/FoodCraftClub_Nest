@@ -1,0 +1,96 @@
+# Node
+node_modules/
+dist/
+coverage/
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Next.js
+.next/
+out/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Prisma
+prisma/migrations/
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Build files
+build/
+public/build/
+
+# Cache
+.cache/
+.npm/
+.eslintcache
+
+# Testing
+/coverage
+/cypress/videos/
+/cypress/screenshots/
+
+# Yarn
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.pnp.*
+
+# Directus
+directus/uploads/
+directus/extensions/
+
+# Clerk
+.clerk-frontend/
+
+# Temp files
+*.tmp
+*.temp
+
+# Typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# Vercel
+.vercel
+
+# Local Netlify folder
+.netlify
+
+# Turbo
+.turbo
+
+# Storybook
+storybook-static/
+
+# Serverless
+.serverless/
+
+# Backend specific
+backend/dist/
+backend/node_modules/
+
+# Frontend specific
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/

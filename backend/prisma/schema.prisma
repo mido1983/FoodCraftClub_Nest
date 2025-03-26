@@ -1,0 +1,164 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// User model with Clerk integration
+model User {
+  id            String         @id // Clerk user ID
+  email         String         @unique
+  firstName     String?
+  lastName      String?
+  role          UserRole       @default(CLIENT)
+  points        Int            @default(0)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  
+  // Relations
+  products      Product[]
+  orders        Order[]
+  sellerProfile SellerProfile?
+  subscription  StripeSubscription?
+  
+  // Stripe customer ID for payments
+  stripeCustomerId String?     @unique
+}
+
+enum UserRole {
+  CLIENT
+  SELLER
+  ADMIN
+}
+
+// Product model (managed via Directus)
+model Product {
+  id          String   @id @default(uuid())
+  name        String
+  description String?  @db.Text
+  price       Float
+  imageUrl    String?
+  stock       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  sellerId    String
+  seller      User     @relation(fields: [sellerId], references: [id])
+  orderItems  OrderItem[]
+  
+  @@index([sellerId])
+}
+
+// Order model
+model Order {
+  id              String      @id @default(uuid())
+  status          OrderStatus @default(PENDING)
+  totalAmount     Float
+  pointsUsed      Int         @default(0)
+  pointsEarned    Int         @default(0)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  
+  // Relations
+  userId          String
+  user            User        @relation(fields: [userId], references: [id])
+  orderItems      OrderItem[]
+  
+  // Stripe payment information
+  stripePaymentIntentId String?  @unique
+  
+  @@index([userId])
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+// OrderItem model (for order items)
+model OrderItem {
+  id        String   @id @default(uuid())
+  quantity  Int
+  price     Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  
+  @@index([orderId])
+  @@index([productId])
+}
+
+// Subscription model (managed via Stripe)
+model StripeSubscription {
+  id                String            @id // Stripe subscription ID
+  type              SubscriptionType
+  status            SubscriptionStatus @default(ACTIVE)
+  startDate         DateTime
+  endDate           DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  
+  // Relations
+  userId            String            @unique
+  user              User              @relation(fields: [userId], references: [id], map: "StripeSubscription_userId_fkey")
+  
+  // Stripe specific fields
+  stripePriceId     String
+  stripeCustomerId  String
+  currentPeriodEnd  DateTime
+}
+
+enum SubscriptionType {
+  VIP_CLIENT
+  SELLER_BASIC
+  SELLER_PREMIUM
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  UNPAID
+  TRIAL
+}
+
+// SellerProfile for additional seller information
+model SellerProfile {
+  id              String   @id @default(uuid())
+  companyName     String
+  description     String?  @db.Text
+  contactPhone    String?
+  contactEmail    String?
+  isVerified      Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id])
+}
+
+// WebhookEvent model for storing webhook events
+model WebhookEvent {
+  id        String   @id @default(uuid())
+  type      String   // e.g., 'stripe.payment_intent.succeeded', 'clerk.user.created'
+  payload   String   @db.Text // JSON payload as string
+  processed Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
