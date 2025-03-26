@@ -1,82 +1,102 @@
 "use client";
 
 import React from 'react';
-import Image from 'next/image';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from './ui/card';
-import { Button } from './ui/button';
-import { formatPrice } from '@/lib/utils';
-import { ShoppingCartIcon } from '@heroicons/react/24/outline';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { useAnalytics } from "@/providers/analytics-provider";
+import { useUser } from "@clerk/nextjs";
+import { Product } from "@/lib/api";
 
 interface ProductCardProps {
-  product: {
-    id: string;
-    name: string;
-    description: string;
-    price: number;
-    imageUrl: string;
-    sellerId: string;
-  };
+  product: Product;
+  onAddToCart?: (productId: string) => void;
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
+const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }) => {
   const [isLoading, setIsLoading] = React.useState(false);
+  const { captureEvent } = useAnalytics();
+  const { isSignedIn, user } = useUser();
 
   const handleAddToCart = async () => {
     setIsLoading(true);
     try {
       // В реальном приложении здесь будет вызов API для добавления в корзину
-      console.log(`Добавление товара ${product.id} в корзину`);
-      // Визуальная обратная связь для пользователя
-      await new Promise(resolve => setTimeout(resolve, 500)); // Имитация задержки
+      // Отправляем событие добавления товара в корзину в PostHog
+      captureEvent('product_added_to_cart', {
+        product_id: product.id,
+        product_name: product.name,
+        product_price: product.price,
+        user_id: isSignedIn ? user.id : 'anonymous',
+      });
+      // Имитация задержки
+      await new Promise(resolve => setTimeout(resolve, 500));
+      // Успешное добавление
+      console.log(`Товар ${product.name} добавлен в корзину`);
+      
+      // Вызываем внешний обработчик, если он есть
+      if (onAddToCart) {
+        onAddToCart(product.id);
+      }
     } catch (error) {
       console.error('Ошибка при добавлении в корзину:', error);
+      // Отправляем событие об ошибке добавления товара в корзину в PostHog
+      captureEvent('product_add_to_cart_error', {
+        product_id: product.id,
+        error_message: error instanceof Error ? error.message : 'Unknown error',
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleProductView = () => {
+    // Отправляем событие просмотра товара в PostHog
+    captureEvent('product_viewed', {
+      product_id: product.id,
+      product_name: product.name,
+      product_price: product.price,
+      user_id: isSignedIn ? user.id : 'anonymous',
+    });
+  };
+
+  // Отправляем событие просмотра товара при монтировании компонента
+  React.useEffect(() => {
+    handleProductView();
+  }, []);
+
   return (
-    <Card className="overflow-hidden transition-all hover:shadow-lg">
-      <div className="relative h-48 w-full overflow-hidden">
-        {product.imageUrl ? (
-          <Image
-            src={product.imageUrl}
-            alt={product.name}
-            fill
-            className="object-cover transition-transform hover:scale-105"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-muted">
-            <span className="text-muted-foreground">Нет изображения</span>
-          </div>
-        )}
-      </div>
-      <CardHeader className="p-4">
-        <CardTitle className="line-clamp-1 text-lg">{product.name}</CardTitle>
+    <Card className="h-full flex flex-col">
+      <CardHeader>
+        <CardTitle className="line-clamp-1">{product.name}</CardTitle>
       </CardHeader>
-      <CardContent className="p-4 pt-0">
-        <p className="line-clamp-2 mb-2 text-sm text-muted-foreground">
-          {product.description}
-        </p>
-        <p className="text-lg font-bold">{formatPrice(product.price)}</p>
+      <CardContent className="flex-grow">
+        <div className="aspect-square w-full relative mb-4 bg-gray-100 rounded-md overflow-hidden">
+          {product.imageUrl ? (
+            <img 
+              src={product.imageUrl} 
+              alt={product.name} 
+              className="object-cover w-full h-full"
+              onLoad={() => {
+                // Отправляем событие загрузки изображения товара в PostHog
+                captureEvent('product_image_loaded', { product_id: product.id });
+              }}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-gray-400">
+              Нет изображения
+            </div>
+          )}
+        </div>
+        <p className="text-gray-500 line-clamp-2 text-sm mb-2">{product.description}</p>
+        <p className="font-bold text-lg">{product.price.toLocaleString('ru-RU')} ₽</p>
       </CardContent>
-      <CardFooter className="p-4">
+      <CardFooter>
         <Button 
-          onClick={handleAddToCart} 
           className="w-full" 
+          onClick={handleAddToCart} 
           disabled={isLoading}
         >
-          {isLoading ? (
-            <span className="flex items-center gap-2">
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-background border-r-transparent" />
-              Добавление...
-            </span>
-          ) : (
-            <span className="flex items-center gap-2">
-              <ShoppingCartIcon className="h-4 w-4" />
-              В корзину
-            </span>
-          )}
+          {isLoading ? 'Добавление...' : 'В корзину'}
         </Button>
       </CardFooter>
     </Card>

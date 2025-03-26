@@ -1,0 +1,21 @@
+nvm use 18.18.2
+cd foodcraft-admin
+npx directus start
+http://localhost:8055
+
+
+
+NestJS backend
+nvm use 20.17.0
+cd backend
+npm install
+npx prisma generate
+npm run start:dev
+ http://localhost:3001 или http://localhost:3000
+
+Next.js frontend
+nvm use 20.17.0
+cd frontend
+npm install
+npm run dev
+http://localhost:3000

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { ClerkProvider } from '@clerk/nextjs';
 import { ThemeProvider } from "@/components/theme-provider";
+import { AnalyticsProvider } from "@/providers/analytics-provider";
 import Header from "@/components/header";
 import Footer from "@/components/footer";
 import "./globals.css";
@@ -38,9 +39,11 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            <Header />
-            <main className="flex-grow">{children}</main>
-            <Footer />
+            <AnalyticsProvider>
+              <Header />
+              <main className="flex-grow">{children}</main>
+              <Footer />
+            </AnalyticsProvider>
           </ThemeProvider>
         </body>
       </html>

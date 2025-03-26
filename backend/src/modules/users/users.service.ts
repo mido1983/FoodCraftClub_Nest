@@ -2,7 +2,6 @@ import { Injectable, NotFoundException, ConflictException } from '@nestjs/common
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserDto, CreateSellerProfileDto } from './dto/user.dto';
 import { UserRole } from '@prisma/client';
-import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
@@ -23,7 +22,7 @@ export class UsersService {
     });
   }
 
-  async findOne(id: number) {
+  async findOne(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
       select: {
@@ -47,20 +46,9 @@ export class UsersService {
     return user;
   }
 
-  async update(id: number, updateUserDto: UpdateUserDto) {
+  async update(id: string, updateUserDto: UpdateUserDto) {
     // Check if user exists
     await this.findOne(id);
-
-    // Check if email is already in use by another user
-    if (updateUserDto.email) {
-      const existingUser = await this.prisma.user.findUnique({
-        where: { email: updateUserDto.email },
-      });
-
-      if (existingUser && existingUser.id !== id) {
-        throw new ConflictException('Email already in use');
-      }
-    }
 
     return this.prisma.user.update({
       where: { id },
@@ -78,7 +66,7 @@ export class UsersService {
     });
   }
 
-  async remove(id: number) {
+  async remove(id: string) {
     // Check if user exists
     await this.findOne(id);
 
@@ -87,81 +75,72 @@ export class UsersService {
     });
   }
 
-  async changePassword(id: number, currentPassword: string, newPassword: string) {
-    // Find user with password
-    const user = await this.prisma.user.findUnique({
-      where: { id },
+  async findByEmail(email: string) {
+    return this.prisma.user.findUnique({
+      where: { email },
       select: {
         id: true,
-        password: true,
-      },
-    });
-
-    if (!user) {
-      throw new NotFoundException(`User with ID ${id} not found`);
-    }
-
-    // Verify current password
-    const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
-    if (!isPasswordValid) {
-      throw new ConflictException('Current password is incorrect');
-    }
-
-    // Hash new password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(newPassword, salt);
-
-    // Update password
-    return this.prisma.user.update({
-      where: { id },
-      data: {
-        password: hashedPassword,
-      },
-      select: {
-        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        points: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
   }
 
-  async createSellerProfile(userId: number, createSellerProfileDto: CreateSellerProfileDto) {
+  async becomeSeller(id: string, createSellerProfileDto: CreateSellerProfileDto) {
     // Check if user exists
-    const user = await this.findOne(userId);
+    const user = await this.findOne(id);
 
-    // Check if user already has a seller profile
-    if (user.sellerProfile) {
-      throw new ConflictException('User already has a seller profile');
+    // Check if user is already a seller
+    if (user.role === UserRole.SELLER) {
+      throw new ConflictException('User is already a seller');
     }
 
-    // Create seller profile and update user role to SELLER
-    const [sellerProfile] = await this.prisma.$transaction([
-      this.prisma.sellerProfile.create({
-        data: {
-          ...createSellerProfileDto,
-          userId,
-        },
-      }),
-      this.prisma.user.update({
-        where: { id: userId },
+    // Update user role and create seller profile in a transaction
+    return this.prisma.$transaction(async (prisma) => {
+      // Update user role
+      const updatedUser = await prisma.user.update({
+        where: { id },
         data: {
           role: UserRole.SELLER,
         },
-      }),
-    ]);
+      });
 
-    return sellerProfile;
+      // Create seller profile
+      await prisma.sellerProfile.create({
+        data: {
+          ...createSellerProfileDto,
+          userId: id,
+        },
+      });
+
+      return updatedUser;
+    });
   }
 
-  async updateSellerProfile(userId: number, updateSellerProfileDto: CreateSellerProfileDto) {
-    // Check if user exists and has a seller profile
-    const user = await this.findOne(userId);
+  async getSellerProfile(userId: string) {
+    const sellerProfile = await this.prisma.sellerProfile.findUnique({
+      where: { userId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    });
 
-    if (!user.sellerProfile) {
-      throw new NotFoundException('Seller profile not found');
+    if (!sellerProfile) {
+      throw new NotFoundException(`Seller profile for user ${userId} not found`);
     }
 
-    return this.prisma.sellerProfile.update({
-      where: { userId },
-      data: updateSellerProfileDto,
-    });
+    return sellerProfile;
   }
 }

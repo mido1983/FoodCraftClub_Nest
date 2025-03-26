@@ -7,7 +7,7 @@ import { UserRole } from '@prisma/client';
 export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(createProductDto: CreateProductDto, userId: number) {
+  async create(createProductDto: CreateProductDto, userId: string) {
     // Check if user is a seller
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -69,7 +69,7 @@ export class ProductsService {
     });
   }
 
-  async findOne(id: number) {
+  async findOne(id: string) {
     const product = await this.prisma.product.findUnique({
       where: { id },
       include: {
@@ -99,7 +99,7 @@ export class ProductsService {
     return product;
   }
 
-  async update(id: number, updateProductDto: UpdateProductDto, userId: number) {
+  async update(id: string, updateProductDto: UpdateProductDto, userId: string) {
     // Check if product exists
     const product = await this.findOne(id);
 
@@ -119,7 +119,7 @@ export class ProductsService {
     });
   }
 
-  async remove(id: number, userId: number) {
+  async remove(id: string, userId: string) {
     // Check if product exists
     const product = await this.findOne(id);
 
@@ -138,7 +138,7 @@ export class ProductsService {
     });
   }
 
-  async getSellerProducts(sellerId: number) {
+  async getSellerProducts(sellerId: string) {
     return this.prisma.product.findMany({
       where: { sellerId },
     });

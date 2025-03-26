@@ -1,11 +1,11 @@
-import { IsNotEmpty, IsNumber, IsOptional, Min, IsArray, ValidateNested, IsEnum } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsOptional, Min, IsArray, ValidateNested, IsEnum, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
 import { OrderStatus } from '@prisma/client';
 
 class OrderItemDto {
-  @IsNumber()
+  @IsString()
   @IsNotEmpty()
-  productId: number;
+  productId: string;
 
   @IsNumber()
   @Min(1, { message: 'Quantity must be at least 1' })

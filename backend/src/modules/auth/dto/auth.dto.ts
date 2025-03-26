@@ -34,7 +34,7 @@ export class LoginDto {
 export class AuthResponseDto {
   accessToken: string;
   user: {
-    id: number;
+    id: string;
     email: string;
     firstName: string;
     lastName?: string;

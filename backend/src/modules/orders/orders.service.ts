@@ -7,7 +7,7 @@ import { OrderStatus, UserRole } from '@prisma/client';
 export class OrdersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(createOrderDto: CreateOrderDto, userId: number) {
+  async create(createOrderDto: CreateOrderDto, userId: string) {
     const { items, pointsUsed = 0 } = createOrderDto;
 
     // Check if user exists
@@ -117,8 +117,8 @@ export class OrdersService {
     return order;
   }
 
-  async findAll(userId: number, role: UserRole) {
-    // If admin, return all orders
+  async findAll(userId: string, role: UserRole) {
+    // Admins can see all orders
     if (role === UserRole.ADMIN) {
       return this.prisma.order.findMany({
         include: {
@@ -142,25 +142,18 @@ export class OrdersService {
       });
     }
 
-    // If seller, return orders containing their products
+    // Sellers can see orders containing their products
     if (role === UserRole.SELLER) {
+      // Get seller's products
       const sellerProducts = await this.prisma.product.findMany({
         where: { sellerId: userId },
         select: { id: true },
       });
 
-      const productIds = sellerProducts.map((product) => product.id);
+      const sellerProductIds = sellerProducts.map((product) => product.id);
 
+      // Get orders containing seller's products
       return this.prisma.order.findMany({
-        where: {
-          orderItems: {
-            some: {
-              productId: {
-                in: productIds,
-              },
-            },
-          },
-        },
         include: {
           user: {
             select: {
@@ -176,13 +169,22 @@ export class OrdersService {
             },
           },
         },
+        where: {
+          orderItems: {
+            some: {
+              productId: {
+                in: sellerProductIds,
+              },
+            },
+          },
+        },
         orderBy: {
           createdAt: 'desc',
         },
       });
     }
 
-    // If client, return their orders
+    // Clients can only see their own orders
     return this.prisma.order.findMany({
       where: { userId },
       include: {
@@ -198,7 +200,7 @@ export class OrdersService {
     });
   }
 
-  async findOne(id: number, userId: number, role: UserRole) {
+  async findOne(id: string, userId: string, role: UserRole) {
     const order = await this.prisma.order.findUnique({
       where: { id },
       include: {
@@ -222,69 +224,82 @@ export class OrdersService {
       throw new NotFoundException(`Order with ID ${id} not found`);
     }
 
-    // Check if user has permission to view this order
+    // Check if user has access to this order
     if (role === UserRole.CLIENT && order.userId !== userId) {
-      throw new ForbiddenException('You do not have permission to view this order');
+      throw new ForbiddenException('You do not have access to this order');
     }
 
     if (role === UserRole.SELLER) {
-      // Check if any of the order items belong to the seller
+      // Get seller's products
       const sellerProducts = await this.prisma.product.findMany({
         where: { sellerId: userId },
         select: { id: true },
       });
 
-      const productIds = sellerProducts.map((product) => product.id);
+      const sellerProductIds = sellerProducts.map((product) => product.id);
+
+      // Check if order contains any of the seller's products
       const hasSellerProduct = order.orderItems.some((item) =>
-        productIds.includes(item.productId),
+        sellerProductIds.includes(item.productId),
       );
 
       if (!hasSellerProduct) {
-        throw new ForbiddenException('You do not have permission to view this order');
+        throw new ForbiddenException('You do not have access to this order');
       }
     }
 
     return order;
   }
 
-  async updateStatus(id: number, updateOrderStatusDto: UpdateOrderStatusDto, userId: number, role: UserRole) {
-    // Check if order exists
+  async updateStatus(id: string, updateOrderStatusDto: UpdateOrderStatusDto, userId: string, role: UserRole) {
+    // Check if order exists and user has access
     const order = await this.findOne(id, userId, role);
 
-    // Only admins can update order status
-    if (role !== UserRole.ADMIN) {
-      throw new ForbiddenException('Only admins can update order status');
+    // Only admins and sellers can update order status
+    if (role === UserRole.CLIENT) {
+      throw new ForbiddenException('Clients cannot update order status');
     }
 
+    // Update order status
     return this.prisma.order.update({
       where: { id },
       data: {
         status: updateOrderStatusDto.status,
       },
+      include: {
+        orderItems: {
+          include: {
+            product: true,
+          },
+        },
+      },
     });
   }
 
-  async cancel(id: number, userId: number, role: UserRole) {
-    // Check if order exists
+  async cancel(id: string, userId: string, role: UserRole) {
+    // Check if order exists and user has access
     const order = await this.findOne(id, userId, role);
 
-    // Only the user who placed the order or an admin can cancel it
+    // Only admin or the order owner can cancel an order
     if (role !== UserRole.ADMIN && order.userId !== userId) {
       throw new ForbiddenException('You do not have permission to cancel this order');
     }
 
-    // Check if order can be cancelled (only PENDING orders can be cancelled)
+    // Can only cancel orders in PENDING status
     if (order.status !== OrderStatus.PENDING) {
-      throw new BadRequestException('Only pending orders can be cancelled');
+      throw new BadRequestException('Only pending orders can be canceled');
     }
 
-    // Cancel order and restore stock and points in a transaction
+    // Cancel order and restore stock in a transaction
     return this.prisma.$transaction(async (prisma) => {
-      // Update order status
-      const cancelledOrder = await prisma.order.update({
+      // Update order status to CANCELED
+      const canceledOrder = await prisma.order.update({
         where: { id },
         data: {
           status: OrderStatus.CANCELLED,
+        },
+        include: {
+          orderItems: true,
         },
       });
 
@@ -300,18 +315,20 @@ export class OrdersService {
         });
       }
 
-      // Restore user points (refund points used, remove points earned)
-      await prisma.user.update({
-        where: { id: order.userId },
-        data: {
-          points: {
-            increment: order.pointsUsed,
-            decrement: order.pointsEarned,
+      // Restore user points if any were used
+      if (order.pointsUsed > 0) {
+        await prisma.user.update({
+          where: { id: order.userId },
+          data: {
+            points: {
+              increment: order.pointsUsed,
+              decrement: order.pointsEarned,
+            },
           },
-        },
-      });
+        });
+      }
 
-      return cancelledOrder;
+      return canceledOrder;
     });
   }
 }

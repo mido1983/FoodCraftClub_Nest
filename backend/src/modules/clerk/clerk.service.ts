@@ -127,7 +127,6 @@ export class ClerkService {
         where: { id: data.id },
         data: {
           processed: true,
-          processedAt: new Date(),
         },
       });
 

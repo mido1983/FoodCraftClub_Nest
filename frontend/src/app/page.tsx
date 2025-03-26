@@ -1,10 +1,12 @@
+'use client'
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import ProductCard from "@/components/product-card";
+import { Product } from "@/lib/api";
 
 // Временные данные для демонстрации
-const mockProducts = [
+const mockProducts: Product[] = [
   {
     id: "1",
     name: "Домашний хлеб на закваске",
@@ -12,6 +14,10 @@ const mockProducts = [
     price: 250,
     imageUrl: "https://images.unsplash.com/photo-1509440159596-0249088772ff?q=80&w=500&auto=format&fit=crop",
     sellerId: "seller1",
+    category: "bread",
+    stock: 15,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   },
   {
     id: "2",
@@ -20,6 +26,10 @@ const mockProducts = [
     price: 350,
     imageUrl: "https://images.unsplash.com/photo-1563805042-7684c019e1cb?q=80&w=500&auto=format&fit=crop",
     sellerId: "seller2",
+    category: "jam",
+    stock: 20,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   },
   {
     id: "3",
@@ -28,6 +38,10 @@ const mockProducts = [
     price: 450,
     imageUrl: "https://images.unsplash.com/photo-1583805989283-15c92588defc?q=80&w=500&auto=format&fit=crop",
     sellerId: "seller3",
+    category: "frozen",
+    stock: 10,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   },
   {
     id: "4",
@@ -36,6 +50,10 @@ const mockProducts = [
     price: 550,
     imageUrl: "https://images.unsplash.com/photo-1452195100486-9cc805987862?q=80&w=500&auto=format&fit=crop",
     sellerId: "seller4",
+    category: "dairy",
+    stock: 5,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   },
 ];
 

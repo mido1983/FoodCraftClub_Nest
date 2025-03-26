@@ -15,7 +15,7 @@ export class StripeService {
   ) {
     // Initialize Stripe with API key from environment variables
     this.stripe = new Stripe(this.configService.get<string>('STRIPE_SECRET_KEY'), {
-      apiVersion: '2023-10-16', // Use the latest API version
+      apiVersion: '2025-02-24.acacia', // Use the latest API version
     });
   }
 
@@ -205,7 +205,6 @@ export class StripeService {
         where: { id: data.id },
         data: {
           processed: true,
-          processedAt: new Date(),
         },
       });
 

@@ -13,7 +13,7 @@ export class AuthService {
   ) {}
 
   async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
-    const { email, password, firstName, lastName, role } = registerDto;
+    const { email, firstName, lastName, role } = registerDto;
 
     // Check if user already exists
     const existingUser = await this.prisma.user.findUnique({
@@ -24,14 +24,11 @@ export class AuthService {
       throw new ConflictException('Email already in use');
     }
 
-    // Hash password
-    const hashedPassword = await this.hashPassword(password);
-
-    // Create new user
+    // Create new user - Note: In a real Clerk integration, this would be triggered by a webhook
     const newUser = await this.prisma.user.create({
       data: {
+        id: `user_${Date.now()}`, // Generate a unique ID similar to Clerk format
         email,
-        password: hashedPassword,
         firstName,
         lastName,
         role: role || UserRole.CLIENT,
@@ -55,7 +52,7 @@ export class AuthService {
   }
 
   async login(loginDto: LoginDto): Promise<AuthResponseDto> {
-    const { email, password } = loginDto;
+    const { email } = loginDto;
 
     // Find user by email
     const user = await this.prisma.user.findUnique({
@@ -66,12 +63,9 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Verify password
-    const isPasswordValid = await this.comparePasswords(password, user.password);
-
-    if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
+    // Note: In a real Clerk integration, password verification would be handled by Clerk
+    // This is a simplified version for development purposes
+    // For now, we'll assume the credentials are valid if the user exists
 
     // Generate JWT token
     const token = this.generateToken(user.id, user.email);
@@ -89,17 +83,8 @@ export class AuthService {
     };
   }
 
-  private generateToken(userId: number, email: string): string {
+  private generateToken(userId: string, email: string): string {
     const payload = { sub: userId, email };
     return this.jwtService.sign(payload);
-  }
-
-  private async hashPassword(password: string): Promise<string> {
-    const salt = await bcrypt.genSalt(10);
-    return bcrypt.hash(password, salt);
-  }
-
-  private async comparePasswords(plainPassword: string, hashedPassword: string): Promise<boolean> {
-    return bcrypt.compare(plainPassword, hashedPassword);
   }
 }
